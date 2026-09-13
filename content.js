@@ -2,7 +2,10 @@
   if (window.__websiteTimeLimiterLoaded) return;
   window.__websiteTimeLimiterLoaded = true;
 
-  const host = location.hostname.toLowerCase().replace(/^www\./, "");
+  const host = location.hostname
+    .toLowerCase()
+    .replace(/^www\./, "");
+
   let overlay = null;
 
   function formatTime(seconds) {
@@ -57,13 +60,26 @@
           host,
           minutes: 5
         });
+
         refresh();
       });
 
       const leave = document.createElement("button");
       leave.className = "wtl-secondary-button";
       leave.textContent = "Close this tab";
-      leave.addEventListener("click", () => window.close());
+      leave.addEventListener("click", async () => {
+        leave.disabled = true;
+        leave.textContent = "Closing…";
+
+        const result = await chrome.runtime.sendMessage({
+          type: "WTL_CLOSE_TAB"
+        }).catch(() => ({ ok: false }));
+
+        if (!result?.ok) {
+          leave.disabled = false;
+          leave.textContent = "Close this tab";
+        }
+      });
 
       buttons.appendChild(five);
       buttons.appendChild(leave);
@@ -78,10 +94,18 @@
 
     document.documentElement.classList.add("wtl-blocked");
 
-    const remaining = Math.max(0, status.limitSeconds - status.usedSeconds);
+    const remaining = Math.max(
+      0,
+      status.limitSeconds - status.usedSeconds
+    );
+
+    const scope = status.includeSubdomains
+      ? `${status.ruleHost} + subdomains`
+      : status.ruleHost || host;
+
     const message = overlay.querySelector("#wtl-message");
     message.textContent =
-      `${host}: ${formatTime(status.usedSeconds)} used today. ` +
+      `${scope}: ${formatTime(status.usedSeconds)} used today. ` +
       `Daily limit: ${formatTime(status.limitSeconds)}. ` +
       `Remaining: ${formatTime(remaining)}.`;
   }
@@ -93,7 +117,7 @@
         host
       });
 
-      if (!status?.tracked) {
+      if (!status?.enabled || !status?.tracked) {
         removeOverlay();
         return;
       }
@@ -111,12 +135,18 @@
   });
 
   window.addEventListener("focus", () => {
-    chrome.runtime.sendMessage({ type: "WTL_FORCE_REFRESH_TRACKER" }).catch(() => {});
+    chrome.runtime
+      .sendMessage({ type: "WTL_FORCE_REFRESH_TRACKER" })
+      .catch(() => {});
+
     refresh();
   });
 
   document.addEventListener("visibilitychange", () => {
-    chrome.runtime.sendMessage({ type: "WTL_FORCE_REFRESH_TRACKER" }).catch(() => {});
+    chrome.runtime
+      .sendMessage({ type: "WTL_FORCE_REFRESH_TRACKER" })
+      .catch(() => {});
+
     refresh();
   });
 

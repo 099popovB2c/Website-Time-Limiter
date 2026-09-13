@@ -8,13 +8,34 @@
 </head>
 <body>
   <main>
-    <h1>Website Time Limiter</h1>
-    <p class="subtitle">Set a daily time budget for distracting websites.</p>
+    <div class="title-row">
+      <div>
+        <h1>Website Time Limiter</h1>
+        <p class="subtitle">Set a daily time budget for distracting websites.</p>
+      </div>
+      <span class="version">v1.1</span>
+    </div>
+
+    <label class="master">
+      <span>
+        <strong>Enable time limits</strong>
+        <small>Pause or resume all website tracking and blocking.</small>
+      </span>
+      <input id="masterEnabled" type="checkbox">
+    </label>
 
     <section class="current-card">
       <div class="eyebrow">Current site</div>
       <div id="currentHost" class="host">Not available</div>
       <div id="currentUsage" class="usage">No active rule.</div>
+
+      <label class="subdomain-toggle">
+        <span>
+          <strong>Include subdomains</strong>
+          <small>Share this time budget with subdomains such as app.example.com.</small>
+        </span>
+        <input id="includeSubdomains" type="checkbox">
+      </label>
 
       <div class="add-row">
         <input id="minutes" type="number" min="1" max="1440" value="30">

@@ -1,11 +1,19 @@
 const $ = id => document.getElementById(id);
 
-function normalizeHost(url) {
+function normalizeHost(urlOrHost) {
+  const raw = String(urlOrHost || "").trim().toLowerCase();
+
   try {
-    return new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+    if (/^https?:\/\//i.test(raw)) {
+      return new URL(raw).hostname
+        .toLowerCase()
+        .replace(/^www\./, "") || null;
+    }
   } catch {
     return null;
   }
+
+  return raw.replace(/^www\./, "") || null;
 }
 
 function todayKey() {
@@ -25,17 +33,38 @@ function formatTime(seconds) {
   return `${m}m`;
 }
 
+function ruleMatchesHost(rule, host) {
+  const ruleHost = normalizeHost(rule.host);
+  const actualHost = normalizeHost(host);
+
+  if (!ruleHost || !actualHost) return false;
+  if (ruleHost === actualHost) return true;
+
+  return Boolean(rule.includeSubdomains) &&
+    actualHost.endsWith(`.${ruleHost}`);
+}
+
 async function activeTab() {
   const [tab] = await chrome.tabs.query({
     active: true,
     currentWindow: true
   });
+
   return tab;
 }
 
-async function getRules() {
-  const stored = await chrome.storage.sync.get({ rules: [] });
-  return Array.isArray(stored.rules) ? stored.rules : [];
+async function getSettings() {
+  const stored = await chrome.storage.sync.get({
+    enabled: true,
+    rules: []
+  });
+
+  return {
+    enabled: stored.enabled !== false,
+    rules: Array.isArray(stored.rules)
+      ? stored.rules
+      : []
+  };
 }
 
 async function saveRules(rules) {
@@ -55,12 +84,23 @@ async function getUsage() {
     return {};
   }
 
-  const usage = { ...(stored.usageSecondsByHost || {}) };
+  const usage = {
+    ...(stored.usageSecondsByHost || {})
+  };
 
-  if (stored.trackerHost && stored.trackerStartedAt) {
+  if (
+    stored.trackerHost &&
+    stored.trackerStartedAt
+  ) {
     usage[stored.trackerHost] =
       Number(usage[stored.trackerHost] || 0) +
-      Math.max(0, Math.floor((Date.now() - Number(stored.trackerStartedAt)) / 1000));
+      Math.max(
+        0,
+        Math.floor(
+          (Date.now() -
+            Number(stored.trackerStartedAt)) / 1000
+        )
+      );
   }
 
   return usage;
@@ -70,23 +110,37 @@ async function renderCurrentSite(rules, usage) {
   const tab = await activeTab();
   const host = normalizeHost(tab?.url || "");
 
-  $("currentHost").textContent = host || "Not available";
+  $("currentHost").textContent =
+    host || "Not available";
 
   if (!host) {
     $("addCurrent").disabled = true;
-    $("currentUsage").textContent = "Open a normal website first.";
+    $("currentUsage").textContent =
+      "Open a normal website first.";
     return;
   }
 
   $("addCurrent").disabled = false;
 
-  const rule = rules.find(item => item.host === host);
+  const rule = rules.find(item =>
+    ruleMatchesHost(item, host)
+  );
 
   if (rule) {
+    const usageHost = normalizeHost(rule.host);
+
     $("minutes").value = String(rule.minutes);
+    $("includeSubdomains").checked =
+      Boolean(rule.includeSubdomains);
+
     $("currentUsage").textContent =
-      `${formatTime(usage[host] || 0)} used today • ${rule.minutes} min limit`;
+      `${formatTime(usage[usageHost] || 0)} used today • ` +
+      `${rule.minutes} min limit` +
+      (rule.includeSubdomains
+        ? " • shared with subdomains"
+        : "");
   } else {
+    $("includeSubdomains").checked = false;
     $("currentUsage").textContent =
       `${formatTime(usage[host] || 0)} used today • no limit yet`;
   }
@@ -103,10 +157,18 @@ function ruleRow(rule, usageSeconds) {
   host.textContent = rule.host;
 
   const meta = document.createElement("small");
-  meta.textContent = `${formatTime(usageSeconds)} used • ${rule.minutes} min/day`;
+  meta.textContent =
+    `${formatTime(usageSeconds)} used • ` +
+    `${rule.minutes} min/day` +
+    (rule.includeSubdomains
+      ? " • + subdomains"
+      : "");
 
   text.appendChild(host);
   text.appendChild(meta);
+
+  const controls = document.createElement("div");
+  controls.className = "rule-controls";
 
   const input = document.createElement("input");
   input.type = "number";
@@ -116,36 +178,98 @@ function ruleRow(rule, usageSeconds) {
   input.title = "Minutes per day";
 
   input.addEventListener("change", async () => {
-    const rules = await getRules();
-    const found = rules.find(item => item.host === rule.host);
+    const { rules } = await getSettings();
+    const found = rules.find(
+      item => item.host === rule.host
+    );
+
     if (!found) return;
 
-    found.minutes = Math.max(1, Math.min(1440, Number(input.value) || 30));
+    found.minutes = Math.max(
+      1,
+      Math.min(
+        1440,
+        Number(input.value) || 30
+      )
+    );
+
     input.value = String(found.minutes);
     await saveRules(rules);
   });
+
+  const subdomains = document.createElement("label");
+  subdomains.className = "mini-toggle";
+  subdomains.title = "Include subdomains";
+
+  const subCheckbox = document.createElement("input");
+  subCheckbox.type = "checkbox";
+  subCheckbox.checked =
+    Boolean(rule.includeSubdomains);
+
+  const subLabel = document.createElement("span");
+  subLabel.textContent = "Sub";
+
+  subCheckbox.addEventListener(
+    "change",
+    async () => {
+      const { rules } = await getSettings();
+      const found = rules.find(
+        item => item.host === rule.host
+      );
+
+      if (!found) return;
+
+      found.includeSubdomains =
+        subCheckbox.checked;
+
+      await saveRules(rules);
+    }
+  );
+
+  subdomains.appendChild(subCheckbox);
+  subdomains.appendChild(subLabel);
+
+  controls.appendChild(input);
+  controls.appendChild(subdomains);
 
   const remove = document.createElement("button");
   remove.className = "remove";
   remove.textContent = "×";
   remove.title = "Remove limit";
+
   remove.addEventListener("click", async () => {
-    const rules = (await getRules()).filter(item => item.host !== rule.host);
-    await saveRules(rules);
+    const { rules } = await getSettings();
+
+    await saveRules(
+      rules.filter(
+        item => item.host !== rule.host
+      )
+    );
   });
 
   wrap.appendChild(text);
-  wrap.appendChild(input);
+  wrap.appendChild(controls);
   wrap.appendChild(remove);
 
   return wrap;
 }
 
 async function render() {
-  const rules = await getRules();
+  const settings = await getSettings();
+  const rules = settings.rules;
   const usage = await getUsage();
 
-  $("ruleCount").textContent = `${rules.length} site${rules.length === 1 ? "" : "s"}`;
+  $("masterEnabled").checked =
+    settings.enabled;
+
+  document.body.classList.toggle(
+    "wtl-paused",
+    !settings.enabled
+  );
+
+  $("ruleCount").textContent =
+    `${rules.length} site${rules.length === 1 ? "" : "s"}`;
+
   $("rules").replaceChildren();
 
   if (!rules.length) {
@@ -154,83 +278,187 @@ async function render() {
     empty.textContent = "No website limits yet.";
     $("rules").appendChild(empty);
   } else {
-    for (const rule of [...rules].sort((a, b) => a.host.localeCompare(b.host))) {
-      $("rules").appendChild(ruleRow(rule, Number(usage[rule.host] || 0)));
+    for (
+      const rule of [...rules].sort(
+        (a, b) =>
+          a.host.localeCompare(b.host)
+      )
+    ) {
+      const usageHost =
+        normalizeHost(rule.host);
+
+      $("rules").appendChild(
+        ruleRow(
+          rule,
+          Number(usage[usageHost] || 0)
+        )
+      );
     }
   }
 
   await renderCurrentSite(rules, usage);
 }
 
-$("addCurrent").addEventListener("click", async () => {
-  const tab = await activeTab();
-  const host = normalizeHost(tab?.url || "");
-
-  if (!host) {
-    $("status").textContent = "Open a normal website first.";
-    return;
-  }
-
-  const minutes = Math.max(
-    1,
-    Math.min(1440, Number($("minutes").value) || 30)
-  );
-
-  $("minutes").value = String(minutes);
-
-  const rules = await getRules();
-  const existing = rules.find(rule => rule.host === host);
-
-  if (existing) {
-    existing.minutes = minutes;
-    existing.enabled = true;
-  } else {
-    rules.push({
-      host,
-      minutes,
-      enabled: true
+$("masterEnabled").addEventListener(
+  "change",
+  async event => {
+    await chrome.storage.sync.set({
+      enabled: event.target.checked
     });
+
+    await chrome.runtime.sendMessage({
+      type: "WTL_FORCE_REFRESH_TRACKER"
+    }).catch(() => {});
+
+    await render();
+
+    $("status").textContent =
+      event.target.checked
+        ? "Time limits enabled."
+        : "Time limits paused.";
   }
+);
 
-  await saveRules(rules);
-  $("status").textContent = `${host}: ${minutes} min/day saved.`;
-});
+$("addCurrent").addEventListener(
+  "click",
+  async () => {
+    const tab = await activeTab();
+    const host = normalizeHost(tab?.url || "");
 
-$("focusPreset").addEventListener("click", async () => {
-  const preset = [
-    { host: "x.com", minutes: 30, enabled: true },
-    { host: "youtube.com", minutes: 60, enabled: true },
-    { host: "reddit.com", minutes: 30, enabled: true },
-    { host: "instagram.com", minutes: 30, enabled: true },
-    { host: "facebook.com", minutes: 30, enabled: true }
-  ];
+    if (!host) {
+      $("status").textContent =
+        "Open a normal website first.";
+      return;
+    }
 
-  const ok = window.confirm(
-    "Apply Focus preset?\n\nX: 30 min\nYouTube: 60 min\nReddit: 30 min\nInstagram: 30 min\nFacebook: 30 min"
-  );
+    const minutes = Math.max(
+      1,
+      Math.min(
+        1440,
+        Number($("minutes").value) || 30
+      )
+    );
 
-  if (!ok) return;
+    $("minutes").value = String(minutes);
 
-  await saveRules(preset);
-  $("status").textContent = "Focus preset applied.";
-});
+    const settings = await getSettings();
+    const rules = settings.rules;
 
-$("resetUsage").addEventListener("click", async () => {
-  const ok = window.confirm("Reset today's tracked time for all limited websites?");
-  if (!ok) return;
+    const exact = rules.find(
+      rule => normalizeHost(rule.host) === host
+    );
 
-  await chrome.storage.local.set({
-    usageDate: todayKey(),
-    usageSecondsByHost: {},
-    unlockUntilByHost: {},
-    trackerHost: null,
-    trackerStartedAt: null
-  });
+    if (exact) {
+      exact.minutes = minutes;
+      exact.enabled = true;
+      exact.includeSubdomains =
+        $("includeSubdomains").checked;
+    } else {
+      rules.push({
+        host,
+        minutes,
+        enabled: true,
+        includeSubdomains:
+          $("includeSubdomains").checked
+      });
+    }
 
-  await chrome.runtime.sendMessage({ type: "WTL_FORCE_REFRESH_TRACKER" }).catch(() => {});
-  await render();
-  $("status").textContent = "Today's usage reset.";
-});
+    await saveRules(rules);
+
+    $("status").textContent =
+      `${host}: ${minutes} min/day saved` +
+      ($("includeSubdomains").checked
+        ? " + subdomains."
+        : ".");
+  }
+);
+
+$("focusPreset").addEventListener(
+  "click",
+  async () => {
+    const preset = [
+      {
+        host: "x.com",
+        minutes: 30,
+        enabled: true,
+        includeSubdomains: true
+      },
+      {
+        host: "youtube.com",
+        minutes: 60,
+        enabled: true,
+        includeSubdomains: true
+      },
+      {
+        host: "reddit.com",
+        minutes: 30,
+        enabled: true,
+        includeSubdomains: true
+      },
+      {
+        host: "instagram.com",
+        minutes: 30,
+        enabled: true,
+        includeSubdomains: true
+      },
+      {
+        host: "facebook.com",
+        minutes: 30,
+        enabled: true,
+        includeSubdomains: true
+      }
+    ];
+
+    const ok = window.confirm(
+      "Apply Focus preset?\n\n" +
+      "X: 30 min\n" +
+      "YouTube: 60 min\n" +
+      "Reddit: 30 min\n" +
+      "Instagram: 30 min\n" +
+      "Facebook: 30 min\n\n" +
+      "Subdomains will share each site's budget."
+    );
+
+    if (!ok) return;
+
+    await chrome.storage.sync.set({
+      enabled: true,
+      rules: preset
+    });
+
+    await render();
+    $("status").textContent =
+      "Focus preset applied.";
+  }
+);
+
+$("resetUsage").addEventListener(
+  "click",
+  async () => {
+    const ok = window.confirm(
+      "Reset today's tracked time for all limited websites?"
+    );
+
+    if (!ok) return;
+
+    await chrome.storage.local.set({
+      usageDate: todayKey(),
+      usageSecondsByHost: {},
+      unlockUntilByHost: {},
+      trackerHost: null,
+      trackerStartedAt: null
+    });
+
+    await chrome.runtime.sendMessage({
+      type: "WTL_FORCE_REFRESH_TRACKER"
+    }).catch(() => {});
+
+    await render();
+
+    $("status").textContent =
+      "Today's usage reset.";
+  }
+);
 
 render().catch(error => {
   $("status").textContent = String(error);

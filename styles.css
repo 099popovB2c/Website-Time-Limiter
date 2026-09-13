@@ -55,6 +55,11 @@ html.wtl-blocked body > *:not(#wtl-overlay) {
   cursor: pointer !important;
 }
 
+#wtl-overlay button:disabled {
+  opacity: .55 !important;
+  cursor: default !important;
+}
+
 #wtl-overlay .wtl-secondary-button {
   background: #334155 !important;
 }
