@@ -1,0 +1,60 @@
+html.wtl-blocked body > *:not(#wtl-overlay) {
+  visibility: hidden !important;
+}
+
+#wtl-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483647 !important;
+  display: grid !important;
+  place-items: center !important;
+  background: #0b1020 !important;
+  color: #f8fafc !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+}
+
+#wtl-overlay .wtl-card {
+  width: min(500px, calc(100vw - 32px)) !important;
+  padding: 28px !important;
+  border: 1px solid #334155 !important;
+  border-radius: 20px !important;
+  background: #111827 !important;
+  box-shadow: 0 24px 80px rgba(0,0,0,.45) !important;
+}
+
+#wtl-overlay h1 {
+  margin: 0 0 12px !important;
+  color: #f8fafc !important;
+  font-size: 28px !important;
+  line-height: 1.2 !important;
+}
+
+#wtl-overlay p {
+  color: #e2e8f0 !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+#wtl-overlay .wtl-secondary {
+  color: #94a3b8 !important;
+}
+
+#wtl-overlay .wtl-actions {
+  display: flex !important;
+  gap: 10px !important;
+  margin-top: 18px !important;
+}
+
+#wtl-overlay button {
+  padding: 11px 15px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: #2563eb !important;
+  color: white !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+}
+
+#wtl-overlay .wtl-secondary-button {
+  background: #334155 !important;
+}

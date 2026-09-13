@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Website Time Limiter</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <h1>Website Time Limiter</h1>
+    <p class="subtitle">Set a daily time budget for distracting websites.</p>
+
+    <section class="current-card">
+      <div class="eyebrow">Current site</div>
+      <div id="currentHost" class="host">Not available</div>
+      <div id="currentUsage" class="usage">No active rule.</div>
+
+      <div class="add-row">
+        <input id="minutes" type="number" min="1" max="1440" value="30">
+        <button id="addCurrent" class="primary">Add / Update</button>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <strong>Daily limits</strong>
+        <span id="ruleCount">0 sites</span>
+      </div>
+      <div id="rules" class="rules"></div>
+    </section>
+
+    <section class="presets">
+      <button id="focusPreset">Focus preset</button>
+      <button id="resetUsage">Reset today</button>
+    </section>
+
+    <p id="status" class="status">Only active-tab time is counted.</p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
