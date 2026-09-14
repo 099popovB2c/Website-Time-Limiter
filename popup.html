@@ -13,14 +13,11 @@
         <h1>Website Time Limiter</h1>
         <p class="subtitle">Set a daily time budget for distracting websites.</p>
       </div>
-      <span class="version">v1.1</span>
+      <span class="version">v1.2</span>
     </div>
 
     <label class="master">
-      <span>
-        <strong>Enable time limits</strong>
-        <small>Pause or resume all website tracking and blocking.</small>
-      </span>
+      <span><strong>Enable time limits</strong><small>Pause or resume all website tracking and blocking.</small></span>
       <input id="masterEnabled" type="checkbox">
     </label>
 
@@ -28,15 +25,10 @@
       <div class="eyebrow">Current site</div>
       <div id="currentHost" class="host">Not available</div>
       <div id="currentUsage" class="usage">No active rule.</div>
-
       <label class="subdomain-toggle">
-        <span>
-          <strong>Include subdomains</strong>
-          <small>Share this time budget with subdomains such as app.example.com.</small>
-        </span>
+        <span><strong>Include subdomains</strong><small>Share this time budget with subdomains such as app.example.com.</small></span>
         <input id="includeSubdomains" type="checkbox">
       </label>
-
       <div class="add-row">
         <input id="minutes" type="number" min="1" max="1440" value="30">
         <button id="addCurrent" class="primary">Add / Update</button>
@@ -44,10 +36,7 @@
     </section>
 
     <section>
-      <div class="section-head">
-        <strong>Daily limits</strong>
-        <span id="ruleCount">0 sites</span>
-      </div>
+      <div class="section-head"><strong>Daily limits</strong><span id="ruleCount">0 sites</span></div>
       <div id="rules" class="rules"></div>
     </section>
 
@@ -56,8 +45,15 @@
       <button id="resetUsage">Reset today</button>
     </section>
 
+    <section class="presets">
+      <button id="exportRules">Export rules</button>
+      <button id="importRulesButton">Import rules</button>
+      <input id="importRulesFile" type="file" accept="application/json,.json" hidden>
+    </section>
+
     <p id="status" class="status">Only active-tab time is counted.</p>
   </main>
   <script src="popup.js"></script>
+  <script src="backup.js"></script>
 </body>
 </html>
