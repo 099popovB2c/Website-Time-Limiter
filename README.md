@@ -2,6 +2,12 @@
 
 A privacy-first Chrome extension for setting daily time budgets on websites.
 
+## v1.2.0
+
+- Added portable **rule backup and restore**.
+- Website-limit rules can be exported and imported without re-entering them manually.
+- Keeps the master enable/disable switch, shared subdomain budgets and reliable tab closing from v1.1.0.
+
 ## v1.1.0
 
 - Added a **master enable/disable** switch.
